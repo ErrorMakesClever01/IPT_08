@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './List.css'
 import { url, currency } from '../../assets/assets'
 import axios from 'axios';
