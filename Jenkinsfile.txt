@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'food-agent' } 
+    agent { label 'food-agent' }
 
     environment {
         //  app server Private IP
