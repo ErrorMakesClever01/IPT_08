@@ -2,4 +2,4 @@
 .env.*
 !.env.example
 node_modules
-dist
+distRemove-Item -Force .git/index.lock
