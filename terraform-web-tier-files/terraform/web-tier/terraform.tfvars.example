@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (which is not committed) and change what you need.
+owner = "Preethi"
+
+# First test: one server. When it works, change web_min_size to 2.
+web_min_size         = 1
+web_desired_capacity = 1
+web_max_size         = 4
+
+# Set to true once you are happy, to scale to zero at 11 PM and back up at 9 AM (India time)
+enable_schedules = false
+web_day_size     = 2
