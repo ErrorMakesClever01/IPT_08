@@ -31,6 +31,7 @@ pipeline {
                 sh '''
                 aws ecs update-service --cluster "$ECS_CLUSTER" --service food-backend-service --force-new-deployment --region "$AWS_REGION"
                 aws ecs update-service --cluster "$ECS_CLUSTER" --service food-admin-service --force-new-deployment --region "$AWS_REGION"
+                aws ecs update-service --cluster "$ECS_CLUSTER" --service food-frontend-service --force-new-deployment --region "$AWS_REGION"
                 '''
             }
         }
