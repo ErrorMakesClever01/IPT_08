@@ -3,24 +3,18 @@ pipeline {
 
     environment {
         AWS_REGION  = "ap-south-1"
-        ACCOUNT_ID  = "895579567065"
         ECS_CLUSTER = "food-cluster"
     }
 
     stages {
-        stage('Login to Amazon ECR') {
+        stage('Login, Build & Push to ECR') {
             steps {
                 sh '''
-                REG=$(printf "%s.dkr.ecr.%://amazonaws.com" "$ACCOUNT_ID" "$AWS_REGION")
-                aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REG"
-                '''
-            }
-        }
+                REPO_URI=$(aws ecr describe-repositories --repository-names food-backend --region "$AWS_REGION" --query 'repositories[0].repositoryUri' --output text)
+                REG=$(dirname "$REPO_URI")
 
-        stage('Build & Push to ECR') {
-            steps {
-                sh '''
-                REG=$(printf "%s.dkr.ecr.%://amazonaws.com" "$ACCOUNT_ID" "$AWS_REGION")
+                aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REG"
+
                 docker build -t "$REG/food-backend:latest" ./backend
                 docker build -t "$REG/food-frontend:latest" ./frontend
                 docker build -t "$REG/food-admin:latest" ./admin
