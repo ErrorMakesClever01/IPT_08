@@ -2,29 +2,40 @@ pipeline {
     agent { label 'food-agent' }
 
     environment {
-        //  app server Private IP
-        APP_SERVER_IP = "172.31.6.81" 
+        AWS_REGION   = "ap-south-1"
+        ECR_REGISTRY = "://amazonaws.com"
+        ECS_CLUSTER  = "food-cluster"
     }
 
     stages {
-        stage('Build & Push to ECR') {
+        stage('Login to Amazon ECR') {
             steps {
-               
-                echo "Building Docker Images..."
-                // sh 'docker build -t ...'
-                echo "Pushing to AWS ECR..."
-                // sh 'docker push ...'
+                sh """
+                aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                """
             }
         }
 
-        stage('Deploy to App Server') {
+        stage('Build & Push to ECR') {
             steps {
-                
-                sshagent(['app-server-key']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER_IP} 'cd IPT_08 && docker compose pull && docker compose up -d'
-                    """
-                }
+                sh """
+                docker build -t ${ECR_REGISTRY}/food-backend:latest ./backend
+                docker build -t ${ECR_REGISTRY}/food-frontend:latest ./frontend
+                docker build -t ${ECR_REGISTRY}/food-admin:latest ./admin
+
+                docker push ${ECR_REGISTRY}/food-backend:latest
+                docker push ${ECR_REGISTRY}/food-frontend:latest
+                docker push ${ECR_REGISTRY}/food-admin:latest
+                """
+            }
+        }
+
+        stage('Deploy to Amazon ECS') {
+            steps {
+                sh """
+                aws ecs update-service --cluster ${ECS_CLUSTER} --service food-backend-service --force-new-deployment --region ${AWS_REGION}
+                aws ecs update-service --cluster ${ECS_CLUSTER} --service food-admin-service --force-new-deployment --region ${AWS_REGION}
+                """
             }
         }
     }
