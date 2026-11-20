@@ -25,6 +25,8 @@ Manage customer orders
 
 Monitor user activity and sales statistics
 
+Can track the orders
+
 ## 🌐 Tech Stack
 Frontend: React.js, Tailwind CSS / Bootstrap (optional)
 
