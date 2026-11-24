@@ -22,7 +22,7 @@ A full-stack, three-tier food delivery web application (**Customer Storefront**,
                            ▼          ▼          ▼
         ┌──────────────────────────────────────────────────────┐
         │         AWS ECS Cluster (food-cluster)               │
-        │  2 × t3.medium EC2 Nodes (ASG via Terraform)         │
+        │  2 × t3.small EC2 Nodes (ASG via Terraform)         │
         │                                                      │
         │  ┌────────────────┐ ┌───────────────┐ ┌───────────┐  │
         │  │  food-backend  │ │  food-admin   │ │ food-web  │  │
@@ -44,7 +44,7 @@ A full-stack, three-tier food delivery web application (**Customer Storefront**,
 
 ### Core Architectural Highlights
 * **Infrastructure as Code (`Terraform`):** Provisions and manages the **Application Load Balancer (`food-alb`)**, Target Groups (`food-tg-backend`, `food-tg-admin`, `food-tg-web`), Layer-7 listener rules, Security Groups, and **Auto Scaling** policies (both EC2 Auto Scaling Group capacity and ECS Service CPU target-tracking auto-scaling from `2` to `4` tasks at `70%` CPU).
-* **Stateless Auto-Scaling Compute (`Amazon ECS`):** Runs containerized microservices across **2 × `t3.medium` EC2 worker instances** using **100% min / 200% max zero-downtime rolling deployments**.
+* **Stateless Auto-Scaling Compute (`Amazon ECS`):** Runs containerized microservices across **2 × `t3.small` EC2 worker instances** using **100% min / 200% max zero-downtime rolling deployments**.
 * **Layer-7 Traffic Routing (`food-alb`):** Routes incoming traffic based on URL paths (`/api/*`, `/images/*` → backend) and host headers (`admin.tomato-foods.duckdns.org` → admin portal), with cookie-based stickiness enabled on `food-tg-backend` for multi-replica image uploads.
 * **Zero-Hardcoded Secrets (`AWS SSM Parameter Store`):** All sensitive credentials (`MONGO_URI`, `JWT_SECRET`, `ADMIN_USER`, and `ADMIN_PASS`) are stored encrypted at rest as **`SecureString`** parameters under `/tomato/prod/*` in AWS Systems Manager Parameter Store and injected dynamically into ECS tasks at runtime via `ValueFrom` (and `docker-entrypoint.sh` for Nginx `.htpasswd`).
 * **Decoupled Stateful Database Tier:** Isolates MongoDB (`food_app`) onto a dedicated private VPC EC2 instance (`172.31.6.81`) restricted strictly to internal VPC traffic on TCP port `27017`, protecting user and order data across container replacements and scaling events.
@@ -140,7 +140,26 @@ terraform apply
 
 Before releasing updates, run an automated HTTP smoke test to verify ALB routing, API database connectivity, and Admin Panel access controls:
 
+
 ```bash
 # 1. Verify Customer Frontend (Expected: 200)
-curl -s -o /dev/null -w "Customer Frontend: %{http_code}\n" http://duckdns.org
+curl -s -o /dev/null -w "Customer Frontend: %{http_code}\n" http://duckdns.org/
+
+# 2. Verify Backend API + MongoDB Read (Expected: 200)
+curl -s -o /dev/null -w "Backend Food API:  %{http_code}\n" http://duckdns.org/api/food/list
+
+# 3. Verify Unauthenticated Admin Block (Expected: 401)
+curl -s -o /dev/null -w "Admin Unauth Check: %{http_code}\n" http://duckdns.org
+
+# 4. Verify Authenticated Admin Access (Expected: 200)
+curl -s -o /dev/null -w "Admin Auth Check:   %{http_code}\n" -u admin:<ADMIN_PASSWORD> http://duckdns.org
+```
+
+---
+
+## 🔮 Future Enhancements
+
+* **End-to-End HTTPS (`ACM` + `Route 53`):** Attach an AWS Certificate Manager SSL/TLS certificate to `food-alb` on port `443` with automatic `HTTP -> HTTPS` redirection.
+* **Shared Persistent Media Storage (`Amazon S3`):** Migrate uploaded dish images (`/images/*`) from container storage to an **Amazon S3 bucket + CloudFront CDN** for stateless multi-replica persistence.
+• **Full-Stack `Terraform` Coverage:** Expand the existing Terraform configuration (ALB & Auto Scaling) to also manage the VPC, ECS Cluster, Task Definitions, and SSM Parameter Store resources.
 
