@@ -1,48 +1,153 @@
-# 🍔 Food Delivery Website (MERN Stack)
-This is a full-stack Food Delivery Web Application built using the MERN stack (MongoDB, Express.js, React, Node.js). The platform provides a seamless experience for users to browse food items, place orders, manage their cart, and track their delivery. It also features user authentication and an admin dashboard to manage products and orders efficiently.
-### demolink: 
-https://food-delivery-admin-j5gt.onrender.com
-https://food-delivery-bc.onrender.com
+# 🍅 Tomato Food Delivery Platform — End-to-End AWS ECS & DevOps Architecture
 
-## 🚀 Features
-👤 User Features
-Sign up / Sign in with JWT-based authentication
+A full-stack, three-tier food delivery web application (**Customer Storefront**, **Restaurant Admin Portal**, and **Node.js/Express REST API** backed by **MongoDB**) re-architected from a single-server setup into a high-availability, auto-scaling **Amazon ECS** production environment in **AWS Mumbai (`ap-south-1`)**.
 
-Browse food menu with categories (e.g., Pizza, Burgers, Desserts, etc.)
+---
 
-Add/remove items to cart
+## 🏗️ System Architecture
 
-Place orders and view order history
+```text
+                        [ Users & Restaurant Admins ]
+                                      │
+                     (DuckDNS: tomato-foods.duckdns.org)
+                     (DuckDNS: admin.tomato-foods.duckdns.org)
+                                      ▼
+                    ┌───────────────────────────────────┐
+                    │  AWS Application Load Balancer    │
+                    │           (food-alb :80)          │
+                    └──────┬──────────┬──────────┬──────┘
+                           │          │          │
+              /api/* &     │          │ Host:    │ Default
+              /images/*    │          │ admin.*  │ (/*)
+                           ▼          ▼          ▼
+        ┌──────────────────────────────────────────────────────┐
+        │         AWS ECS Cluster (food-cluster)               │
+        │     2 × t3.medium EC2 Worker Nodes (Auto Scaling)    │
+        │                                                      │
+        │  ┌────────────────┐ ┌───────────────┐ ┌───────────┐  │
+        │  │  food-backend  │ │  food-admin   │ │ food-web  │  │
+        │  │ Node.js (:4000)│ │ Nginx (:80)   │ │Nginx (:80)│  │
+        │  │  (2–4 Tasks)   │ │  (1 Task)     │ │(2–4 Tasks)│  │
+        │  └───────┬────────┘ └───────────────┘ └───────────┘  │
+        └──────────┼───────────────────────────────────────────┘
+                   │ Private VPC (TCP :27017)
+                   ▼
+        ┌──────────────────────────────────────────────────────┐
+        │   Decoupled Stateful Database Tier (Private VPC)     │
+        │       EC2 (food-app) — MongoDB (food_app DB)         │
+        └──────────────────────────────────────────────────────┘
+```
 
-Track order status (e.g., Pending, In-Progress, Delivered)
+### Core Architectural Highlights
+* **Stateless Auto-Scaling Compute (`Amazon ECS`):** Runs containerized microservices across **2 × `t3.medium` EC2 worker instances** managed by an Auto Scaling Group (`Infra-ECS-Cluster-food-cluster`). Frontend and backend services scale horizontally between **2 and 4 tasks** at **70% CPU utilization** using **100% min / 200% max zero-downtime rolling deployments**.
+* **Layer-7 Traffic Routing (`food-alb`):** Routes incoming traffic across three health-checked Target Groups (`food-tg-backend`, `food-tg-admin`, `food-tg-web`) based on URL paths (`/api/*`, `/images/*`) and host headers (`admin.tomato-foods.duckdns.org`), with cookie-based stickiness enabled on `food-tg-backend`.
+* **Decoupled Stateful Database Tier:** Isolates MongoDB (`food_app`) onto a dedicated private VPC EC2 instance restricted strictly to internal VPC traffic on TCP port `27017`, protecting customer and order data across container replacements and scaling events.
+* **Admin Portal Hardening:** Secures `food-admin` at the reverse-proxy layer using **Nginx HTTP Basic Authentication** (`.htpasswd`), with a `map $http_user_agent` exemption for `ELB-HealthChecker` so ALB health checks pass with `HTTP 200 OK` while blocking unauthenticated users (`HTTP 401`).
+* **Automated CI/CD (`Jenkins` + `Amazon ECR`):** Distributed **Jenkins Controller + Build Agent (`food-agent`)** builds multi-stage Docker images, pushes `:latest` tags to Amazon ECR, and triggers `aws ecs update-service --force-new-deployment`.
+* **Full-Stack Observability (`Prometheus`, `Grafana` & `CloudWatch`):**
+  * **EC2 Launch Template User Data** automatically provisions `node-exporter` (`:9100`) and `cAdvisor` (`:8080`) on every ECS worker node on boot.
+  * **Prometheus** uses dynamic AWS EC2 service discovery (`ec2_sd_configs` with read-only IAM role) to auto-discover scaling ECS nodes and visualize metrics in **Grafana** (Overview, Server Health, and Container Resource dashboards).
+  * **Amazon CloudWatch** tracks request counts across Availability Zones (`ap-south-1a/b/c`) and triggers **SNS email alarms** when backend `5XX` errors exceed 5 per minute.
 
-## 🛠️ Admin Features
-Admin login with secure authentication
+---
 
-Add, update, or delete food items
+## 🛠️ Tech Stack
 
-Manage customer orders
+| Layer | Technologies Used |
+| :--- | :--- |
+| **Frontend & Admin** | React.js, Vite, CSS3, Nginx (`1.27-alpine`) |
+| **Backend & Database** | Node.js, Express.js, Mongoose, Multer, JWT, MongoDB |
+| **Containerization** | Docker (Multi-Stage Builds), Amazon ECR |
+| **Orchestration & Cloud** | AWS ECS (EC2 Launch Type), Application Load Balancer (ALB), Auto Scaling Groups, VPC, IAM, DuckDNS |
+| **CI/CD Automation** | Jenkins (Distributed Controller & Agent), AWS CLI |
+| **Monitoring & Alerting** | Prometheus (`ec2_sd_configs`), Grafana, Node Exporter, cAdvisor, AWS CloudWatch & SNS |
 
-Monitor user activity and sales statistics
+---
 
-Can track the orders
+## 📂 Repository Structure
 
-## 🌐 Tech Stack
-Frontend: React.js, Tailwind CSS / Bootstrap (optional)
+```text
+├── backend/                  # Node.js + Express REST API
+│   ├── config/               # MongoDB connection setup
+│   ├── controllers/          # Food, User, Cart, and Order business logic
+│   ├── middleware/           # JWT authentication middleware
+│   ├── models/               # Mongoose schemas (food, user, order)
+│   ├── routes/               # API routes (/api/food, /api/user, /api/cart, /api/order)
+│   ├── uploads/              # Uploaded menu item images (/images/*)
+│   ├── Dockerfile            # Backend container build definition
+│   └── server.js             # Express entry point (Port 4000)
+│
+├── frontend/                 # Customer-facing React Storefront
+│   ├── src/                  # Components, pages, and StoreContext
+│   ├── Dockerfile            # Multi-stage React build -> Nginx (:80)
+│   └── nginx.conf            # SPA routing configuration
+│
+├── admin/                    # Protected Restaurant Admin Portal
+│   ├── src/                  # Add Items, List Items, and Order Status management
+│   ├── Dockerfile            # Multi-stage build + apache2-utils (.htpasswd generation)
+│   └── nginx.conf            # HTTP Basic Auth + ELB-HealthChecker exemption
+│
+└── Jenkinsfile               # Automated build, ECR push, and ECS rolling deployment pipeline
+```
 
-Backend: Node.js, Express.js
+---
 
-Database: MongoDB (with Mongoose ODM)
+## ⚙️ Environment Variables
 
-Authentication: JSON Web Token (JWT)
+Configure the following environment variables in your **ECS Task Definitions** (or local `.env` files for development):
 
-Others: Axios, React Router, dotenv, Bcrypt
- 
-## 💡 Future Improvements
-Payment Gateway Integration (e.g., Stripe/Razorpay)
+### Backend (`food-backend-task`)
+```env
+PORT=4000
+MONGO_URI=mongodb://<DB_USER>:<DB_PASSWORD>@<PRIVATE_DB_IP>:27017/food_app?authSource=admin
+JWT_SECRET=<YOUR_JWT_SECRET>
+```
 
-Real-time order status updates using WebSockets
+### Frontend & Admin (`food-frontend-task` / `food-admin-task`)
+```env
+VITE_API_URL=http://duckdns.org
+```
 
-Push notifications
+---
 
-Delivery partner module with map integration
+## 🚀 CI/CD Deployment Workflow
+
+1. **Code Commit:** Developer pushes changes to GitHub (`main` branch).
+2. **Distributed Build:** Jenkins Controller delegates `Master-pipeline` execution to the dedicated build agent (`food-agent`).
+3. **Container Build & Push:** Jenkins builds updated Docker images for `food-backend`, `food-frontend`, and `food-admin`, tagging and pushing `:latest` to **Amazon ECR**.
+4. **Zero-Downtime Rollout:** Jenkins executes:
+   ```bash
+   aws ecs update-service --cluster food-cluster --service food-backend-service --force-new-deployment --region ap-south-1
+   aws ecs update-service --cluster food-cluster --service food-frontend-service --force-new-deployment --region ap-south-1
+   aws ecs update-service --cluster food-cluster --service food-admin-service --force-new-deployment --region ap-south-1
+   ```
+5. **Health Verification:** ECS launches new tasks, waits for `food-alb` Target Group health checks (`HTTP 200 OK`) to pass, and drains old containers.
+
+---
+
+## 🧪 Smoke Testing & Verification
+
+Before releasing updates, run an automated HTTP smoke test to verify routing, API database connectivity, and Admin Panel access controls:
+
+```bash
+# 1. Verify Customer Frontend (Expected: 200)
+curl -s -o /dev/null -w "Customer Frontend: %{http_code}\n" http://duckdns.org/
+
+# 2. Verify Backend API + MongoDB Read (Expected: 200)
+curl -s -o /dev/null -w "Backend Food API:  %{http_code}\n" http://duckdns.org/api/food/list
+
+# 3. Verify Unauthenticated Admin Block (Expected: 401)
+curl -s -o /dev/null -w "Admin Unauth Check: %{http_code}\n" http://duckdns.org
+
+# 4. Verify Authenticated Admin Access (Expected: 200)
+curl -s -o /dev/null -w "Admin Auth Check:   %{http_code}\n" -u admin:<ADMIN_PASSWORD> http://duckdns.org
+```
+
+---
+
+## 🔮 Future Enhancements
+
+* **End-to-End HTTPS (`ACM` + `Route 53`):** Attach an AWS Certificate Manager SSL/TLS certificate to `food-alb` on port `443` with automatic `HTTP -> HTTPS` redirection.
+* **Shared Persistent Media Storage (`Amazon S3`):** Migrate uploaded dish images (`/images/*`) from container storage to an **Amazon S3 bucket + CloudFront CDN** for stateless multi-replica persistence.
+* **Managed Multi-AZ Database:** Migrate MongoDB to **MongoDB Atlas** or **Amazon DocumentDB** for automated Multi-AZ failover and point-in-time backups.
+* **Infrastructure as Code (`Terraform`):** Codify the VPC, ALB, ECS cluster, Launch Templates, and IAM roles in Terraform for one-click reproducible environments.
