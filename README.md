@@ -161,5 +161,5 @@ curl -s -o /dev/null -w "Admin Auth Check:   %{http_code}\n" -u admin:<ADMIN_PAS
 
 * **End-to-End HTTPS (`ACM` + `Route 53`):** Attach an AWS Certificate Manager SSL/TLS certificate to `food-alb` on port `443` with automatic `HTTP -> HTTPS` redirection.
 * **Shared Persistent Media Storage (`Amazon S3`):** Migrate uploaded dish images (`/images/*`) from container storage to an **Amazon S3 bucket + CloudFront CDN** for stateless multi-replica persistence.
-• **Full-Stack `Terraform` Coverage:** Expand the existing Terraform configuration (ALB & Auto Scaling) to also manage the VPC, ECS Cluster, Task Definitions, and SSM Parameter Store resources.
+* **Full-Stack `Terraform` Coverage:** Expand the existing Terraform configuration (ALB & Auto Scaling) to also manage the VPC, ECS Cluster, Task Definitions, and SSM Parameter Store resources.
 
