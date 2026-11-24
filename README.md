@@ -79,11 +79,20 @@ A full-stack, three-tier food delivery web application (**Customer Storefront**,
 ## 📂 Repository Structure
 
 ```text
-├── terraform/                # Infrastructure as Code (ALB, Target Groups, ASG & ECS Auto Scaling)
-│   ├── main.tf               # Core AWS resources (ALB, Listeners, Target Groups, Auto Scaling)
-│   ├── variables.tf          # Input variables (VPC, subnets, cluster & service parameters)
-│   └── outputs.tf            # ALB DNS name and Target Group ARN outputs
-│
+├── terraform/                # Infrastructure as Code (ALB, Target Group & EC2 Auto Scaling)
+│   ├── imported-servers/     # Imported existing EC2 server configuration (food-app)
+│   │   └── main.tf
+│   └── web-tier/             # Load Balancer, Auto Scaling & supporting AWS resources
+│       ├── alb.tf            # Application Load Balancer & Target Group
+│       ├── asg.tf            # Launch Template & EC2 Auto Scaling Group
+│       ├── security.tf       # Security Groups for ALB & EC2 nodes
+│       ├── iam.tf            # IAM roles & instance profiles
+│       ├── alarms.tf         # CloudWatch metric alarms
+│       ├── user-data.sh      # EC2 bootstrap script
+│       ├── variables.tf      # Input variable declarations
+│       ├── outputs.tf        # ALB DNS & Target Group outputs
+│       ├── versions.tf       # Terraform & AWS provider version constraints
+│       └── terraform.tfvars.example
 ├── backend/                  # Node.js + Express REST API
 │   ├── config/               # MongoDB connection setup
 │   ├── controllers/          # Food, User, Cart, and Order business logic
