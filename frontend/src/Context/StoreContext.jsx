@@ -1,11 +1,11 @@
 import { createContext, useEffect, useState } from "react";
-import { food_list, menu_list } from "../assets/assets";
+import { menu_list } from "../assets/assets";
 import axios from "axios";
 export const StoreContext = createContext(null);
 
 const StoreContextProvider = (props) => {
 
-    const url = "https://food-delivery-bc.onrender.com"
+    const url = import.meta.env.VITE_API_URL || ""
     const [food_list, setFoodList] = useState([]);
     const [cartItems, setCartItems] = useState({});
     const [token, setToken] = useState("")
@@ -39,9 +39,7 @@ const StoreContextProvider = (props) => {
                 let itemInfo = food_list.find((product) => product._id === item);
                 totalAmount += itemInfo.price * cartItems[item];
             }  
-            } catch (error) {
-                
-            }
+            } catch (error) {/*item not found */}
             
         }
         return totalAmount;
@@ -54,7 +52,7 @@ const StoreContextProvider = (props) => {
 
     const loadCartData = async (token) => {
         const response = await axios.post(url + "/api/cart/get", {}, { headers: token });
-        setCartItems(response.data.cartData);
+        setCartItems(response.data.cartData || {});
     }
 
     useEffect(() => {
@@ -66,6 +64,7 @@ const StoreContextProvider = (props) => {
             }
         }
         loadData()
+            // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const contextValue = {
